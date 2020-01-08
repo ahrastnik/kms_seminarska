@@ -10,6 +10,7 @@
 typedef enum {
     CMD_RESET,
     CMD_READ,
+    CMD_IDN,
     CMD_NUM
 } command_list_t;
 

@@ -30,6 +30,7 @@
 const char* COMMANDS[] = {
     "reset",
     "read",
+    "*idn?",
     NULL
 };
 
@@ -118,6 +119,10 @@ void handle_command(uint8_t *data, int len) {
             }
             ESP_LOGI(TAG, "Reading samples! %d", sample_number);
             sampler_start(sample_number);
+            break;
+
+        case CMD_IDN:
+            printf("ESP-32\n");
             break;
         
         default:
