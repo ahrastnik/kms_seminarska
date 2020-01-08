@@ -7,7 +7,7 @@
 
 #include "driver/adc.h"
 
-#define DEFAULT_SAMPLE_BUFFER_SIZE     16384
+#define DEFAULT_SAMPLE_BUFFER_SIZE     32768
 
 /**
  * Initialize the ADC

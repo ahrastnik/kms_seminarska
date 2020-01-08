@@ -16,7 +16,7 @@
 
 #define DEFAULT_VREF    3300        //Use adc2_vref_to_gpio() to obtain a better estimate
 #define NO_OF_SAMPLES   64          //Multisampling
-#define SAMPLER_FREQUENCY   12000 // [Hz]
+#define SAMPLER_FREQUENCY   6000 // [Hz]
 #define TIMER_DIVIDER   (TIMER_BASE_CLK / SAMPLER_FREQUENCY)
 
 static esp_adc_cal_characteristics_t *adc_chars;
@@ -30,7 +30,7 @@ static volatile uint16_t sample_buffer_number = 0;
 static volatile uint16_t expected_samples = 0;
 static bool is_sampler_running = false;
 
-static xQueueHandle sampler_queue = NULL;
+static TaskHandle_t sampler_task_handle;
 
 /*
  * Timer group0 ISR handler
@@ -53,21 +53,9 @@ void IRAM_ATTR sampler_isr(void *para)
        and update the alarm time for the timer with without reload */
     TIMERG0.int_clr_timers.t0 = 1;
 
-    // Read ADC
-    uint16_t sample = adc1_get_raw(ADC_CHANNEL_6);
-    sample_buffer_number++;
-
-    if (sample_buffer_number < expected_samples) {
-        /* After the alarm has been triggered
-        we need enable it again, so it is triggered the next time */
-        TIMERG0.hw_timer[timer_idx].config.alarm_en = TIMER_ALARM_EN;
-    } else {
-        // Stop the sampler, when all samples were received
-        sampler_stop();
-    }
-
     /* Now just send the sample back to the main program task */
-    xQueueSendFromISR(sampler_queue, &sample, NULL);
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    vTaskNotifyGiveFromISR(sampler_task_handle, &xHigherPriorityTaskWoken);
 }
 
 /*
@@ -140,10 +128,22 @@ void sampler_stop(void) {
 
 static void sampler_task(void *arg) {
     while (1) {
-        uint16_t sample;
-        xQueueReceive(sampler_queue, &sample, portMAX_DELAY);
+        // Wait for the interrupt to trigger
+        ulTaskNotifyTake(pdFALSE, portMAX_DELAY);
 
-        sample_buffer[sample_buffer_number - 1] = sample;
+        // Read ADC
+        uint16_t sample = adc1_get_raw(ADC_CHANNEL_6);
+        sample_buffer[sample_buffer_number++] = sample;
+        //ESP_LOGI(TAG, "%u:\t%d", sample_buffer_number - 1, sample);
+
+        if (sample_buffer_number < expected_samples) {
+            /* After the alarm has been triggered
+            we need enable it again, so it is triggered the next time */
+            TIMERG0.hw_timer[TIMER_0].config.alarm_en = TIMER_ALARM_EN;
+        } else {
+            // Stop the sampler, when all samples were received
+            sampler_stop();
+        }
 
         // Post the buffered samples
         if (sample_buffer_number >= expected_samples) {
@@ -169,15 +169,14 @@ void adc_init(void) {
 
     // Initialize sampler
     sampler_init(TIMER_GROUP_0, TIMER_0);
-    sampler_queue = xQueueCreate(20, sizeof(uint16_t));
 
     //Characterize ADC
     adc_chars = calloc(1, sizeof(esp_adc_cal_characteristics_t));
-    // esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, atten, ADC_WIDTH_BIT_12, DEFAULT_VREF, adc_chars);
 
     sample_buffer = malloc(sizeof(uint16_t) * DEFAULT_SAMPLE_BUFFER_SIZE);
 
-    xTaskCreate(sampler_task, "sampler_task", 4096, NULL, 5, NULL);
+    xTaskCreate(sampler_task, "sampler_task", 4096, NULL, 5, &sampler_task_handle);
 }
 
 bool is_sampling(void) {
