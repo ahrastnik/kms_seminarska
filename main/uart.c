@@ -17,7 +17,7 @@
 
 #define BUF_SIZE            1024
 
-#define MAX_COMMAND_LEN     32
+#define MAX_COMMAND_LEN     64
 #define MIN_COMMAND_LEN     2
 #define CMD_DELIMITER       " "
 
@@ -66,8 +66,8 @@ void handle_command(uint8_t *data, int len) {
         ESP_LOGE(TAG, "UART transmission error!");
         return;
     }
-    // Length safey check
-    if(len < MIN_COMMAND_LEN || len > MAX_COMMAND_LEN) {
+    // Length safety check
+    if(len <= MIN_COMMAND_LEN || len > MAX_COMMAND_LEN) {
         ESP_LOGE(TAG, "Invalid command length!");
         return;
     }
