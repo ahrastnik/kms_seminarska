@@ -22,7 +22,7 @@
 static esp_adc_cal_characteristics_t *adc_chars;
 static const adc_bits_width_t bit_width = ADC_WIDTH_BIT_12;
 static const adc_channel_t channel = ADC_CHANNEL_6;     //GPIO34 if ADC1, GPIO14 if ADC2
-static const adc_atten_t atten = ADC_ATTEN_DB_0;
+static const adc_atten_t atten = ADC_ATTEN_DB_11;
 
 static uint16_t *sample_buffer = NULL;
 static uint16_t sample_buffer_size = DEFAULT_SAMPLE_BUFFER_SIZE;
@@ -80,7 +80,7 @@ void IRAM_ATTR sampler_isr(void *para)
 static void sampler_init(int group, int timer_idx) {
     /* Select and initialize basic parameters of the timer */
     timer_config_t config;
-    config.divider = 40000;//TIMER_DIVIDER;
+    config.divider = 4000;//TIMER_DIVIDER;
     config.counter_dir = TIMER_COUNT_UP;
     config.counter_en = TIMER_PAUSE;
     config.alarm_en = TIMER_ALARM_EN;
@@ -93,7 +93,7 @@ static void sampler_init(int group, int timer_idx) {
     timer_set_counter_value(group, timer_idx, 0x00000000ULL);
 
     /* Configure the alarm value and the interrupt on alarm. */
-    timer_set_alarm_value(group, timer_idx, 200);
+    timer_set_alarm_value(group, timer_idx, 10);
     timer_enable_intr(group, timer_idx);
     timer_isr_register(group, timer_idx, sampler_isr,
         (void *) timer_idx, ESP_INTR_FLAG_IRAM, NULL);
@@ -149,7 +149,12 @@ static void sampler_task(void *arg) {
         if (sample_buffer_number >= expected_samples) {
             uint16_t i;
             for (i = 0; i < sample_buffer_number; i++) {
-                ESP_LOGI(TAG, "%u:\t%d", i, sample_buffer[i]);
+                printf("%u", sample_buffer[i]);
+                if (i < (sample_buffer_number - 1)) {
+                    printf(",");
+                } else {
+                    printf("\n");
+                }
             }
         }
         

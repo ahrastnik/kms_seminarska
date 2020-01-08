@@ -117,7 +117,6 @@ void handle_command(uint8_t *data, int len) {
                 ESP_LOGE(TAG, "Failed to convert the sample number!");
                 break;
             }
-            ESP_LOGI(TAG, "Reading samples! %d", sample_number);
             sampler_start(sample_number);
             break;
 
